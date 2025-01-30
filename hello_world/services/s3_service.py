@@ -16,19 +16,30 @@ class S3Service:
             logger.error(f"Error reading from S3: {e}") 
             raise
     
-    def list_jpg_images(self, source_bucket: str) -> List[str]:
+    def move_file(self, bucket: str, source_key: str, destination_key: str) -> bool:
         """
-        List all JPG/JPEG images in the source bucket
+        Move file within the same bucket from source_key to destination_key
         """
         try:
-            response = self.s3_client.list_objects_v2(Bucket=source_bucket)
-            return [
-                obj['Key'] for obj in response.get('Contents', []) 
-                if obj['Key'].lower().endswith(('.jpg', '.jpeg'))
-            ]
+            # Copy the object to the new location
+            self.s3_client.copy_object(
+                Bucket=bucket,
+                CopySource={'Bucket': bucket, 'Key': source_key},
+                Key=destination_key
+            )
+            
+            # Delete the original object
+            self.s3_client.delete_object(
+                Bucket=bucket,
+                Key=source_key
+            )
+            
+            logger.info(f"Successfully moved {source_key} to {destination_key}")
+            return True
+            
         except Exception as e:
-            logger.error(f"Error listing images: {e}")
-            return []
+            logger.error(f"Failed to move file from {source_key} to {destination_key}: {str(e)}")
+            return False
             
     def upload_file(self, file_name: str, bucket: str, object_name: Optional[str] = None) -> bool:
         if object_name is None:
